@@ -1,67 +1,73 @@
-/** @format */
-
 const User = require("../models/User");
 
 const createDefaultAdmin = async () => {
 	try {
-		// Check if admin already exists
+		// Check if any admin already exists
 		const adminExists = await User.findOne({
-			username: "admindbu12",
+			$or: [
+				{ username: "admindbu12" },
+				{ email: "admin@dbu.edu.et" }
+			]
 		});
 
 		if (!adminExists) {
 			const admin = await User.create({
 				name: "System Administrator",
 				username: "admindbu12",
-				email: "admin@example.com", // Add an email for the admin
-				password: "Admin123#", // Make sure to hash this in production
+				email: "admin@dbu.edu.et",
+				password: "Admin123#",
 				role: "admin",
 				isAdmin: true,
 				department: "Administration",
-				year: 1, // Ensure this is a valid number
+				year: "1st Year",
 			});
 
-			console.log("Default admin user created:", admin.username);
+			console.log("✅ Default admin user created:", admin.username);
+		} else {
+			console.log("ℹ️ Admin user already exists");
 		}
 
-		// Create some sample students for testing
+		// Create sample students for testing (only if they don't exist)
 		const sampleStudents = [
 			{
 				name: "John Doe",
 				username: "dbu10304058",
-				email: "john.doe@example.com", // Add an email for the student
-				password: "Student123#", // Make sure to hash this in production
+				email: "john.doe@dbu.edu.et",
+				password: "Student123#",
 				role: "student",
 				isAdmin: false,
 				department: "Computer Science",
-				year: 4, // Ensure this is a valid number
+				year: "4th Year",
 			},
 			{
 				name: "Jane Smith",
 				username: "dbu10304059",
-				email: "jane.smith@example.com", // Add an email for the student
-				password: "Student123#", // Make sure to hash this in production
+				email: "jane.smith@dbu.edu.et",
+				password: "Student123#",
 				role: "student",
 				isAdmin: false,
 				department: "Engineering",
-				year: 3, // Ensure this is a valid number
+				year: "3rd Year",
 			},
 		];
 
 		for (const studentData of sampleStudents) {
 			const existingStudent = await User.findOne({
-				username: studentData.username,
+				$or: [
+					{ username: studentData.username },
+					{ email: studentData.email }
+				]
 			});
+			
 			if (!existingStudent) {
-				const student = new User(studentData);
-				await student.save();
-				console.log(`Sample student created: ${studentData.username}`);
+				const student = await User.create(studentData);
+				console.log(`✅ Sample student created: ${studentData.username}`);
 			} else {
-				console.log(`Student already exists: ${studentData.username}`);
+				console.log(`ℹ️ Student already exists: ${studentData.username}`);
 			}
 		}
 	} catch (error) {
-		console.error("Error creating default users:", error);
+		console.error("❌ Error creating default users:", error.message);
 	}
 };
 

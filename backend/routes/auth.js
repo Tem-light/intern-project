@@ -18,17 +18,22 @@ const generateToken = (id) => {
 // @access  Public
 router.post('/register', validateUserRegistration, async (req, res) => {
   try {
-    const { name, username, password, department, year, phoneNumber } = req.body;
+    const { name, username, password, department, year, phoneNumber, email } = req.body;
 
     // Check if user exists
-    const userExists = await User.findOne({ username });
+    const userExists = await User.findOne({
+      $or: [
+        { username: username },
+        ...(email ? [{ email: email }] : [])
+      ]
+    });
+
     if (userExists) {
       return res.status(400).json({
         success: false,
-        message: 'User already exists with this username'
+        message: 'User already exists with this username or email'
       });
     }
-
 
     // Create user
     const user = await User.create({
@@ -37,7 +42,9 @@ router.post('/register', validateUserRegistration, async (req, res) => {
       password,
       department,
       year,
-      phoneNumber
+      phoneNumber,
+      email: email || undefined, // Only set email if provided
+      studentId: username // Use username as student ID
     });
 
     // Generate token
@@ -52,14 +59,27 @@ router.post('/register', validateUserRegistration, async (req, res) => {
         _id: user._id,
         name: user.name,
         username: user.username,
+        email: user.email,
         department: user.department,
         year: user.year,
         role: user.role,
-        isAdmin: user.isAdmin
+        isAdmin: user.isAdmin,
+        profileImage: user.profileImage
       }
     });
   } catch (error) {
     console.error('Registration error:', error);
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Server error during registration'
@@ -67,19 +87,27 @@ router.post('/register', validateUserRegistration, async (req, res) => {
   }
 });
 
-// @desc    Login user
+// @desc    Login user (Student)
 // @route   POST /api/auth/login
 // @access  Public
 router.post('/login', validateUserLogin, async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    // Check for user
+    // Check for user and include password
     const user = await User.findOne({ username }).select('+password');
     if (!user) {
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
+      });
+    }
+
+    // Check if account is locked
+    if (user.isLocked) {
+      return res.status(423).json({
+        success: false,
+        message: 'Account temporarily locked due to too many failed login attempts'
       });
     }
 
@@ -94,6 +122,8 @@ router.post('/login', validateUserLogin, async (req, res) => {
     // Check password
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
+      // Increment login attempts
+      await user.incLoginAttempts();
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
@@ -115,6 +145,7 @@ router.post('/login', validateUserLogin, async (req, res) => {
         _id: user._id,
         name: user.name,
         username: user.username,
+        email: user.email,
         department: user.department,
         year: user.year,
         role: user.role,
@@ -127,6 +158,95 @@ router.post('/login', validateUserLogin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error during login'
+    });
+  }
+});
+
+// @desc    Admin Login
+// @route   POST /api/auth/admin-login
+// @access  Public
+router.post('/admin-login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide username and password'
+      });
+    }
+
+    // Check for admin user and include password
+    const user = await User.findOne({ 
+      username,
+      $or: [
+        { role: 'admin' },
+        { isAdmin: true }
+      ]
+    }).select('+password');
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid admin credentials'
+      });
+    }
+
+    // Check if account is locked
+    if (user.isLocked) {
+      return res.status(423).json({
+        success: false,
+        message: 'Account temporarily locked due to too many failed login attempts'
+      });
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'Account has been deactivated'
+      });
+    }
+
+    // Check password
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      // Increment login attempts
+      await user.incLoginAttempts();
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid admin credentials'
+      });
+    }
+
+    // Update last login
+    await user.updateLastLogin();
+
+    // Generate token
+    const token = generateToken(user._id);
+
+    res.json({
+      success: true,
+      message: 'Admin login successful',
+      token,
+      user: {
+        id: user._id,
+        _id: user._id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        department: user.department,
+        year: user.year,
+        role: user.role,
+        isAdmin: user.isAdmin,
+        profileImage: user.profileImage
+      }
+    });
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during admin login'
     });
   }
 });
@@ -158,7 +278,7 @@ router.get('/profile', protect, async (req, res) => {
 // @access  Private
 router.put('/profile', protect, async (req, res) => {
   try {
-    const { name, department, year, phoneNumber, address } = req.body;
+    const { name, department, year, phoneNumber, address, email } = req.body;
 
     const user = await User.findById(req.user.id);
     if (!user) {
@@ -174,6 +294,7 @@ router.put('/profile', protect, async (req, res) => {
     if (year) user.year = year;
     if (phoneNumber) user.phoneNumber = phoneNumber;
     if (address) user.address = address;
+    if (email) user.email = email;
 
     await user.save();
 
@@ -184,13 +305,14 @@ router.put('/profile', protect, async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        studentId: user.studentId,
+        username: user.username,
         department: user.department,
         year: user.year,
         phoneNumber: user.phoneNumber,
         address: user.address,
         role: user.role,
-        isAdmin: user.isAdmin
+        isAdmin: user.isAdmin,
+        profileImage: user.profileImage
       }
     });
   } catch (error) {
@@ -216,10 +338,10 @@ router.put('/change-password', protect, async (req, res) => {
       });
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       return res.status(400).json({
         success: false,
-        message: 'New password must be at least 6 characters'
+        message: 'New password must be at least 8 characters'
       });
     }
 

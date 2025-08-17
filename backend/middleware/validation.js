@@ -22,6 +22,16 @@ const validateUserRegistration = [
   body('username')
     .matches(/^dbu\d{8}$/i)
     .withMessage('Username must start with dbu followed by 8 digits'),
+  body('email')
+    .optional()
+    .isEmail()
+    .withMessage('Please provide a valid email'),
+  body('department')
+    .notEmpty()
+    .withMessage('Department is required'),
+  body('year')
+    .isIn(['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year'])
+    .withMessage('Please select a valid academic year'),
   body('password')
     .isLength({ min: 8 })
     .withMessage('Password must be at least 8 characters long')

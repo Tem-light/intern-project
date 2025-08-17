@@ -44,41 +44,40 @@ export const AuthProvider = ({ children }) => {
   const login = async (username, password) => {
     try {
       setLoading(true);
+      const response = await apiService.login({ username, password });
+      
+      const studentUser = {
+        ...response.user,
+        token: response.token,
+        isAdmin: response.user.role === "admin" || response.user.isAdmin,
+      };
 
-      // Admin login check
-      if (username.toLowerCase() === "admindbu12" && password === "Admin123#") {
-        const adminUser = {
-          id: "admin_1",
-          username: "AdminDbu12",
-          name: "System Administrator",
-          role: "admin",
-          isAdmin: true,
-          token: "admin_token_" + Date.now(),
-        };
+      localStorage.setItem("user", JSON.stringify(studentUser));
+      setUser(studentUser);
+      
+      return studentUser;
+    } catch (error) {
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        setUser(adminUser);
-        localStorage.setItem("user", JSON.stringify(adminUser));
-        
-        return adminUser;
-      }
+  const adminLogin = async (username, password) => {
+    try {
+      setLoading(true);
+      const response = await apiService.adminLogin({ username, password });
+      
+      const adminUser = {
+        ...response.user,
+        token: response.token,
+        isAdmin: true,
+      };
 
-      // Student login via API
-      try {
-        const response = await apiService.login({ username, password });
-        const studentUser = {
-          ...response.user,
-          token: response.token,
-          isAdmin: response.user.role === "admin",
-        };
-
-        localStorage.setItem("user", JSON.stringify(studentUser));
-        setUser(studentUser);
-        
-        return studentUser;
-      } catch (error) {
-        console.error('API login failed:', error);
-        throw new Error("Invalid username or password");
-      }
+      localStorage.setItem("user", JSON.stringify(adminUser));
+      setUser(adminUser);
+      
+      return adminUser;
     } catch (error) {
       throw error;
     } finally {
@@ -118,6 +117,7 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     login,
+    adminLogin,
     register,
     logout,
   };

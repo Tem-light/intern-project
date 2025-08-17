@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { Eye, EyeOff, User, Lock } from "lucide-react";
+import { Eye, EyeOff, User, Lock, Shield, UserCheck } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 
 export function LoginForm() {
+  const [loginType, setLoginType] = useState("student"); // "student" or "admin"
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -19,11 +20,16 @@ export function LoginForm() {
     name: "",
     department: "",
     year: "",
+    phoneNumber: "",
+    email: "",
   });
 
-  const { login, register } = useAuth();
+  const { login, adminLogin, register } = useAuth();
 
   const validateUsername = (username) => {
+    if (loginType === "admin") {
+      return username.length > 0; // Admin usernames can be flexible
+    }
     const regex = /^dbu\d{8}$/i;
     return regex.test(username);
   };
@@ -44,7 +50,11 @@ export function LoginForm() {
 
     try {
       if (!validateUsername(formData.username)) {
-        toast.error("Username must start with 'dbu' followed by 8 digits (e.g., dbu10304058)");
+        if (loginType === "student") {
+          toast.error("Username must start with 'dbu' followed by 8 digits (e.g., dbu10304058)");
+        } else {
+          toast.error("Please enter a valid admin username");
+        }
         return;
       }
 
@@ -53,8 +63,13 @@ export function LoginForm() {
         return;
       }
 
-      await login(formData.username, formData.password);
-      toast.success("Login successful");
+      if (loginType === "admin") {
+        await adminLogin(formData.username, formData.password);
+        toast.success("Admin login successful");
+      } else {
+        await login(formData.username, formData.password);
+        toast.success("Login successful");
+      }
     } catch (error) {
       toast.error(error.message || "Invalid credentials");
     } finally {
@@ -93,6 +108,8 @@ export function LoginForm() {
         name: registerData.name,
         department: registerData.department,
         year: registerData.year,
+        phoneNumber: registerData.phoneNumber,
+        email: registerData.email,
       });
       toast.success("Registration successful");
     } catch (error) {
@@ -139,6 +156,34 @@ export function LoginForm() {
           </div>
         </div>
 
+        {/* Login Type Toggle (only for login) */}
+        {!showRegister && (
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            <button
+              type="button"
+              onClick={() => setLoginType("student")}
+              className={`flex-1 flex items-center justify-center py-2 px-4 rounded-md font-medium transition-colors ${
+                loginType === "student"
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-gray-600 hover:text-gray-800"
+              }`}>
+              <UserCheck className="w-4 h-4 mr-2" />
+              Student
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginType("admin")}
+              className={`flex-1 flex items-center justify-center py-2 px-4 rounded-md font-medium transition-colors ${
+                loginType === "admin"
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-gray-600 hover:text-gray-800"
+              }`}>
+              <Shield className="w-4 h-4 mr-2" />
+              Admin
+            </button>
+          </div>
+        )}
+
         {/* Form */}
         <motion.form
           initial={{ opacity: 0 }}
@@ -162,11 +207,14 @@ export function LoginForm() {
                 value={showRegister ? registerData.username : formData.username}
                 onChange={handleInputChange}
                 className="pl-10 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                placeholder="dbu10304058"
+                placeholder={loginType === "admin" ? "admin username" : "dbu10304058"}
               />
             </div>
             <p className="mt-1 text-xs text-gray-500">
-              Must start with 'dbu' followed by 8 digits
+              {loginType === "admin" 
+                ? "Enter your admin username" 
+                : "Must start with 'dbu' followed by 8 digits"
+              }
             </p>
           </div>
 
@@ -175,7 +223,7 @@ export function LoginForm() {
             <>
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name
+                  Full Name *
                 </label>
                 <input
                   id="name"
@@ -192,7 +240,7 @@ export function LoginForm() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-2">
-                    Department
+                    Department *
                   </label>
                   <select
                     id="department"
@@ -213,7 +261,7 @@ export function LoginForm() {
 
                 <div>
                   <label htmlFor="year" className="block text-sm font-medium text-gray-700 mb-2">
-                    Year
+                    Year *
                   </label>
                   <select
                     id="year"
@@ -229,6 +277,38 @@ export function LoginForm() {
                     <option value="4th Year">4th Year</option>
                     <option value="5th Year">5th Year</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-2">
+                    Phone Number
+                  </label>
+                  <input
+                    id="phoneNumber"
+                    name="phoneNumber"
+                    type="tel"
+                    value={registerData.phoneNumber}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    placeholder="+251-xxx-xxx-xxx"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                    Email
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={registerData.email}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    placeholder="your.email@dbu.edu.et"
+                  />
                 </div>
               </div>
             </>
@@ -298,7 +378,7 @@ export function LoginForm() {
                 Loading...
               </div>
             ) : (
-              showRegister ? "Register" : "Login"
+              showRegister ? "Register" : `Login as ${loginType === "admin" ? "Admin" : "Student"}`
             )}
           </motion.button>
 
@@ -312,16 +392,25 @@ export function LoginForm() {
             </button>
           </div>
 
-          {/* Admin Demo Credentials */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="text-sm">
-              <p className="font-medium text-blue-800 mb-2">Demo Admin Credentials:</p>
-              <div className="text-blue-700">
-                <span>Username: AdminDbu12</span><br />
-                <span>Password: Admin123#</span>
+          {/* Demo Credentials */}
+          {!showRegister && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="text-sm">
+                <p className="font-medium text-blue-800 mb-2">Demo Credentials:</p>
+                {loginType === "admin" ? (
+                  <div className="text-blue-700">
+                    <span>Username: admindbu12</span><br />
+                    <span>Password: Admin123#</span>
+                  </div>
+                ) : (
+                  <div className="text-blue-700">
+                    <span>Username: dbu10304058</span><br />
+                    <span>Password: Student123#</span>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
+          )}
         </motion.form>
       </motion.div>
     </div>
