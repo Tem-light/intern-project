@@ -27,6 +27,56 @@ const createDefaultAdmin = async () => {
 			console.log("ℹ️ Admin user already exists");
 		}
 
+		// Create additional admin users with different roles
+		const additionalAdmins = [
+			{
+				name: "President Admin",
+				username: "presidentdbu",
+				email: "president@dbu.edu.et",
+				password: "Admin123#",
+				role: "admin",
+				isAdmin: true,
+				department: "Student Affairs",
+				year: "1st Year",
+			},
+			{
+				name: "Academic Affairs Admin",
+				username: "academicdbu",
+				email: "academic@dbu.edu.et",
+				password: "Admin123#",
+				role: "admin",
+				isAdmin: true,
+				department: "Academic Affairs",
+				year: "1st Year",
+			},
+			{
+				name: "Clubs Admin",
+				username: "clubsdbu",
+				email: "clubs@dbu.edu.et",
+				password: "Admin123#",
+				role: "admin",
+				isAdmin: true,
+				department: "Student Activities",
+				year: "1st Year",
+			}
+		];
+
+		for (const adminData of additionalAdmins) {
+			const existingAdmin = await User.findOne({
+				$or: [
+					{ username: adminData.username },
+					{ email: adminData.email }
+				]
+			});
+			
+			if (!existingAdmin) {
+				const admin = await User.create(adminData);
+				console.log(`✅ Admin created: ${adminData.username}`);
+			} else {
+				console.log(`ℹ️ Admin already exists: ${adminData.username}`);
+			}
+		}
+
 		// Create sample students for testing (only if they don't exist)
 		const sampleStudents = [
 			{
